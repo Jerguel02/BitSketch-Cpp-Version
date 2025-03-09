@@ -39,7 +39,7 @@ BitSketch is a pixel art editor and image-to-hex converter built with C++ and Qt
 ## Prerequisites
 
 - **Qt 5.x**: Including `Widgets`, `Gui`, and `Core` modules.
-- **C++17**: Compatible compiler (e.g., GCC, MSVC, Clang).
+- **C++11**: Compatible compiler (e.g., GCC, MSVC, Clang).
 - **CMake** or **qmake**: Build tools.
 - **Operating System**: Linux.
 
