@@ -36,10 +36,10 @@ void PixelArtDialog::initUI() {
     heightInput->setValue(gridHeight);
     heightInput->setPrefix("Height: ");
 
-    applySizeButton = new QPushButton("Áp dụng kích thước", this);
+    applySizeButton = new QPushButton("Apply dimensions", this);
     connect(applySizeButton, &QPushButton::clicked, this, &PixelArtDialog::applySize);
 
-    openImageButton = new QPushButton("Mở hình ảnh", this);
+    openImageButton = new QPushButton("Open image...", this);
     connect(openImageButton, &QPushButton::clicked, this, &PixelArtDialog::openImage);
 
     scene = new QGraphicsScene(this);
@@ -55,22 +55,22 @@ void PixelArtDialog::initUI() {
     undoButton = new QPushButton("Undo", this);
     connect(undoButton, &QPushButton::clicked, this, &PixelArtDialog::undo);
 
-    colorButton = new QPushButton("Chọn màu", this);
+    colorButton = new QPushButton("Choose color", this);
     connect(colorButton, &QPushButton::clicked, this, &PixelArtDialog::chooseColor);
 
-    saveDesignButton = new QPushButton("Lưu thiết kế", this);
+    saveDesignButton = new QPushButton("Save design...", this);
     connect(saveDesignButton, &QPushButton::clicked, this, &PixelArtDialog::savePixelDesign);
 
-    zoomInButton = new QPushButton("Phóng to", this);
+    zoomInButton = new QPushButton("Zoom In", this);
     connect(zoomInButton, &QPushButton::clicked, this, &PixelArtDialog::zoomIn);
 
-    zoomOutButton = new QPushButton("Thu nhỏ", this);
+    zoomOutButton = new QPushButton("Zoom Out", this);
     connect(zoomOutButton, &QPushButton::clicked, this, &PixelArtDialog::zoomOut);
 
-    previewButton = new QPushButton("Xem trước", this);
+    previewButton = new QPushButton("Preview", this);
     connect(previewButton, &QPushButton::clicked, this, &PixelArtDialog::previewImage);
 
-    coordinateCheckbox = new QCheckBox("Xem tọa độ", this);
+    coordinateCheckbox = new QCheckBox("View coordinates", this);
     coordinateCheckbox->setChecked(false);
 
     coordinatesLabel = new QLabel(this);
@@ -125,11 +125,11 @@ void PixelArtDialog::applySize() {
 }
 
 void PixelArtDialog::openImage() {
-    QString filePath = QFileDialog::getOpenFileName(this, "Chọn hình ảnh", "", "Images (*.png *.xpm *.jpg *.bmp)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Select image", "", "Images (*.png *.xpm *.jpg *.bmp)");
     if (!filePath.isEmpty()) {
         QImage image(filePath);
         if (image.isNull()) {
-            QMessageBox::warning(this, "Lỗi", "Không thể mở hình ảnh.");
+            QMessageBox::warning(this, "Error!", "Can't open image.");
             return;
         }
 
@@ -181,7 +181,7 @@ bool PixelArtDialog::eventFilter(QObject* obj, QEvent* event) {
                             pixelMatrix[y][x]->setBrush(QBrush(Qt::white));
                         }
                         if (coordinateCheckbox->isChecked()) {
-                            coordinatesLabel->setText(QString("Tọa độ: (%1, %2)").arg(x).arg(y));
+                            coordinatesLabel->setText(QString("Coordinates: (%1, %2)").arg(x).arg(y));
                         }
                     }
                 }
@@ -199,7 +199,7 @@ bool PixelArtDialog::eventFilter(QObject* obj, QEvent* event) {
                             pixelMatrix[y][x]->setBrush(QBrush(Qt::white));
                         }
                         if (coordinateCheckbox->isChecked()) {
-                            coordinatesLabel->setText(QString("Tọa độ: (%1, %2)").arg(x).arg(y));
+                            coordinatesLabel->setText(QString("Coordinates: (%1, %2)").arg(x).arg(y));
                         }
                     }
                 }
@@ -260,7 +260,7 @@ void PixelArtDialog::updatePixelSizes() {
 
 void PixelArtDialog::savePixelDesign() {
     QFileDialog dialog(this);
-    dialog.setWindowTitle("Lưu thiết kế pixel");
+    dialog.setWindowTitle("Save pixel design");
     dialog.setNameFilter("PNG Files (*.png);;Hex Files (*.txt)");
     dialog.setDefaultSuffix("png");
     dialog.setAcceptMode(QFileDialog::AcceptSave);
@@ -290,7 +290,7 @@ void PixelArtDialog::saveAsImage(const QString& path) {
     }
     painter.end();
     image.save(path);
-    QMessageBox::information(this, "Thông báo", QString("Thiết kế đã được lưu thành hình ảnh: %1").arg(path));
+    QMessageBox::information(this, "Notification", QString("Design saved as image: %1").arg(path));
 }
 
 void PixelArtDialog::saveAsHex(const QString& path) {
@@ -307,7 +307,7 @@ void PixelArtDialog::saveAsHex(const QString& path) {
             out << row.join(", ") << ",\n";
         }
         file.close();
-        QMessageBox::information(this, "Thông báo", QString("Thiết kế đã được lưu thành mã hex: %1").arg(path));
+        QMessageBox::information(this, "Notification", QString("Design saved as hex code: %1").arg(path));
     }
 }
 

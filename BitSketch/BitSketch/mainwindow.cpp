@@ -22,10 +22,10 @@ void MainWindow::initUI() {
     setCentralWidget(centralWidget);
     QVBoxLayout* layout = new QVBoxLayout(centralWidget);
 
-    label = new QLabel("Chọn hình ảnh để chuyển sang mã hex:", this);
-    openButton = new QPushButton("Chọn hình ảnh", this);
-    saveButton = new QPushButton("Lưu mã hex", this);
-    pixelEditorButton = new QPushButton("Chọn pixel", this);
+    label = new QLabel("Select image to convert to hex code", this);
+    openButton = new QPushButton("Select image", this);
+    saveButton = new QPushButton("Save HEX code", this);
+    pixelEditorButton = new QPushButton("Edit pixel", this);
 
     layout->addWidget(label);
     layout->addWidget(openButton);
@@ -38,7 +38,7 @@ void MainWindow::initUI() {
 }
 
 void MainWindow::openImage() {
-    QString fileName = QFileDialog::getOpenFileName(this, "Chọn hình ảnh", "", "Image Files (*.png *.jpg *.bmp)");
+    QString fileName = QFileDialog::getOpenFileName(this, "Select image", "", "Image Files (*.png *.jpg *.bmp)");
     if (!fileName.isEmpty()) {
         delete image;
         image = new QPixmap(fileName);
@@ -59,30 +59,30 @@ void MainWindow::convertImageToHex() {
             }
             hexData.append(row);
         }
-        QMessageBox::information(this, "Thông báo", "Hình ảnh đã được chuyển thành mã hex.");
+        QMessageBox::information(this, "Notification!", "Image has been converted to hex code.");
     }
 }
 
 void MainWindow::saveHex() {
     convertImageToHex();
     if (hexData.isEmpty()) {
-        QMessageBox::warning(this, "Cảnh báo", "Chưa có dữ liệu mã hex để lưu.");
+        QMessageBox::warning(this, "Warning!", "No hex code data to save.");
         return;
     }
 
-    QString savePath = QFileDialog::getSaveFileName(this, "Lưu mã hex", "", "Hex Files (*.txt)");
+    QString savePath = QFileDialog::getSaveFileName(this, "Save hex code", "", "Hex Files (*.txt)");
     if (!savePath.isEmpty()) {
         QFile file(savePath);
         if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream out(&file);
             out << "const uint16_t epd_bitmap_images [] PROGMEM = {\n";
             for (const auto& row : hexData) {
-                QStringList rowList = QStringList(row.begin(), row.end());  // Convert QVector<QString> to QStringList
+                QStringList rowList = QStringList(row.begin(), row.end());
                 out << rowList.join(", ") << ",\n";
             }
             out << "};\n";
             file.close();
-            QMessageBox::information(this, "Thông báo", QString("Mã hex đã được lưu thành: %1").arg(savePath));
+            QMessageBox::information(this, "Notification!", QString("Saved hex code: %1").arg(savePath));
         }
     }
 }

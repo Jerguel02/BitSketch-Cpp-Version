@@ -4,7 +4,7 @@
 
 PreviewDialog::PreviewDialog(const QImage& image, QWidget* parent)
     : QDialog(parent), image(image), scaleFactor(1.0), isDragging(false) {
-    setWindowTitle("Xem trước hình ảnh");
+    setWindowTitle("Preview");
     setFixedSize(800, 600);
 
     imageLabel = new QLabel(this);
