@@ -1,20 +1,18 @@
 #ifndef PIXELARTDIALOG_H
 #define PIXELARTDIALOG_H
 
-#include <QDialog>
-#include <QGraphicsScene>
-#include <QGraphicsView>
+#include <QMainWindow>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QScrollArea>
+#include <QScrollBar>  // Thêm dòng này
 #include <QCheckBox>
 #include <QLabel>
 #include <QColor>
-#include <QVector>
+#include <QImage>
+#include <QPixmap>
 
-class QGraphicsRectItem;
-
-class PixelArtDialog : public QDialog {
+class PixelArtDialog : public QMainWindow {
     Q_OBJECT
 
 public:
@@ -29,16 +27,23 @@ private slots:
     void openImage();
     void chooseColor();
     void undo();
-    void zoomIn();
-    void zoomOut();
+    void redo();
+    void zoomIn(const QPoint& zoomPoint = QPoint());
+    void zoomOut(const QPoint& zoomPoint = QPoint());
     void savePixelDesign();
     void previewImage();
 
 private:
+    struct PixelChange {
+        int x;
+        int y;
+        QColor color;
+    };
+
     void initUI();
     void createPixelGrid();
     void updatePixelSizes();
-    void saveStateToHistory();
+    void saveStateToHistory(int x, int y, QColor color);
     void saveAsImage(const QString& path);
     void saveAsHex(const QString& path);
 
@@ -47,10 +52,11 @@ private:
     int gridHeight;
     bool isDrawing;
     QColor selectedColor;
-    QVector<QVector<QGraphicsRectItem*>> pixelMatrix;
-    QVector<QVector<QColor>> history;
-    QGraphicsScene* scene;
-    QGraphicsView* view;
+    QImage pixelImage;
+    QPixmap pixelPixmap;
+    QLabel* pixelLabel;
+    QVector<PixelChange> history;
+    QVector<PixelChange> redoHistory;
     QScrollArea* scrollArea;
     QSpinBox* widthInput;
     QSpinBox* heightInput;
@@ -66,4 +72,4 @@ private:
     QLabel* coordinatesLabel;
 };
 
-#endif // PIXELARTDIALOG_H
+#endif

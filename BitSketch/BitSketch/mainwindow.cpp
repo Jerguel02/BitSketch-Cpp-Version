@@ -16,7 +16,6 @@ MainWindow::~MainWindow() {
 
 void MainWindow::initUI() {
     setWindowTitle("BitSketch");
-    //setGeometry(100, 100, 400, 300);
 
     QWidget* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
