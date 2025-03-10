@@ -10,12 +10,45 @@
 #include <QTextStream>
 #include <QDebug>
 
-PixelArtDialog::PixelArtDialog(QWidget* parent)
-    : QMainWindow(parent), pixelSize(10), gridWidth(50), gridHeight(50), isDrawing(false), selectedColor(Qt::red) {
-    initUI();
-    showMaximized();
-}
+PixelArtDialog::PixelArtDialog(QWidget* parent) : QMainWindow(parent) {
+    pixelSize = 10;
+    gridWidth = 100;
+    gridHeight = 100;
+    isDrawing = false;
+    selectedColor = Qt::black;
 
+    initUI();  // Khởi tạo UI trước
+    createPixelGrid();
+
+    pixelImage = QImage(gridWidth, gridHeight, QImage::Format_RGB32);
+    pixelImage.fill(Qt::white);
+    pixelPixmap = QPixmap(gridWidth * pixelSize, gridHeight * pixelSize);
+    if (pixelPixmap.isNull()) {
+        qDebug() << "Error: Failed to create initial pixelPixmap";
+        return;
+    }
+    pixelPixmap.fill(Qt::white);
+    painter = new QPainter(&pixelPixmap);
+    painter->drawImage(0, 0, pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
+    pixelLabel->setPixmap(pixelPixmap);
+
+    updateTimer = new QTimer(this);
+    updateTimer->setSingleShot(true);
+    connect(updateTimer, &QTimer::timeout, this, [this]() {
+        if (painter && pixelLabel) {
+            for (const PixelChange& change : pendingUpdates) {
+                if (change.x >= 0 && change.x < gridWidth && change.y >= 0 && change.y < gridHeight) {
+                    pixelImage.setPixelColor(change.x, change.y, change.color);
+                    painter->fillRect(change.x * pixelSize, change.y * pixelSize, pixelSize, pixelSize, change.color);
+                }
+            }
+            pixelLabel->setPixmap(pixelPixmap);
+            pendingUpdates.clear();
+        } else {
+            qDebug() << "Error: painter or pixelLabel is null in updateTimer";
+        }
+    });
+}
 PixelArtDialog::~PixelArtDialog() {}
 
 void PixelArtDialog::initUI() {
@@ -101,29 +134,96 @@ void PixelArtDialog::initUI() {
 }
 
 void PixelArtDialog::createPixelGrid() {
+
+    if (!scrollArea) {
+        qDebug() << "Error: scrollArea is null in createPixelGrid";
+        return;
+    }
+
+    if (gridWidth <= 0 || gridHeight <= 0 || pixelSize <= 0) {
+        qDebug() << "Error: Invalid grid size - gridWidth:" << gridWidth << ", gridHeight:" << gridHeight << ", pixelSize:" << pixelSize;
+        return;
+    }
+
     pixelImage = QImage(gridWidth, gridHeight, QImage::Format_RGB32);
     pixelImage.fill(Qt::white);
+
     pixelPixmap = QPixmap::fromImage(pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
-    if (!pixelLabel) {
-        pixelLabel = new QLabel(this);
-        pixelLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    if (pixelPixmap.isNull()) {
+        qDebug() << "Error: Failed to create pixelPixmap with size" << gridWidth * pixelSize << "x" << gridHeight * pixelSize;
+        return;
     }
+
+    if (scrollArea->widget()) {
+        scrollArea->takeWidget()->deleteLater();
+    }
+
+    pixelLabel = new QLabel(this);
+    pixelLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     pixelLabel->setPixmap(pixelPixmap);
-    pixelLabel->move(0, 0);
     pixelLabel->setFixedSize(gridWidth * pixelSize, gridHeight * pixelSize);
+    pixelLabel->move(0, 0);
+
     scrollArea->setWidget(pixelLabel);
     scrollArea->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+
+
+    pixelLabel->installEventFilter(this);
 }
 
+
+
+
 void PixelArtDialog::applySize() {
-    const int maxSize = 500;
-    gridWidth = qMin(widthInput->value(), maxSize);
-    gridHeight = qMin(heightInput->value(), maxSize);
-    widthInput->setValue(gridWidth);
-    heightInput->setValue(gridHeight);
-    qDebug() << "Applying grid size:" << gridWidth << "x" << gridHeight;
-    createPixelGrid();
-    updatePixelSizes();
+    int newWidth = widthInput->value();
+    int newHeight = heightInput->value();
+
+
+    if (newWidth <= 0 || newHeight <= 0 || newWidth * pixelSize > 32767 || newHeight * pixelSize > 32767) {
+        qDebug() << "Error: Invalid grid size" << newWidth << "x" << newHeight;
+        return;
+    }
+
+
+    QImage oldImage = pixelImage;
+
+
+    gridWidth = newWidth;
+    gridHeight = newHeight;
+    pixelImage = QImage(gridWidth, gridHeight, QImage::Format_RGB32);
+    pixelImage.fill(Qt::white);
+
+
+    int copyWidth = qMin(oldImage.width(), gridWidth);
+    int copyHeight = qMin(oldImage.height(), gridHeight);
+    for (int x = 0; x < copyWidth; ++x) {
+        for (int y = 0; y < copyHeight; ++y) {
+            pixelImage.setPixelColor(x, y, oldImage.pixelColor(x, y));
+        }
+    }
+
+
+    if (updateTimer->isActive()) {
+        updateTimer->stop();
+        pendingUpdates.clear();
+    }
+
+
+    if (painter) {
+        delete painter;
+        painter = nullptr;
+    }
+    pixelPixmap = QPixmap(gridWidth * pixelSize, gridHeight * pixelSize);
+    if (pixelPixmap.isNull()) {
+        qDebug() << "Error: Failed to create pixelPixmap with size" << gridWidth * pixelSize << "x" << gridHeight * pixelSize;
+        return;
+    }
+    pixelPixmap.fill(Qt::white);
+    painter = new QPainter(&pixelPixmap);
+    painter->drawImage(0, 0, pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
+    pixelLabel->setPixmap(pixelPixmap);
+    pixelLabel->setFixedSize(gridWidth * pixelSize, gridHeight * pixelSize);
+    pixelLabel->move(0, 0);
 }
 
 void PixelArtDialog::openImage() {
@@ -138,21 +238,70 @@ void PixelArtDialog::openImage() {
         return;
     }
 
-    // Điều chỉnh kích thước lưới theo ảnh tải lên
     gridWidth = loadedImage.width();
     gridHeight = loadedImage.height();
     widthInput->setValue(gridWidth);
     heightInput->setValue(gridHeight);
 
-    // Sao chép dữ liệu ảnh vào pixelImage
-    pixelImage = loadedImage.convertToFormat(QImage::Format_RGB32);
 
-    // Cập nhật hiển thị
+    if (gridWidth * pixelSize > 32767 || gridHeight * pixelSize > 32767) {
+        QMessageBox::warning(this, "Error", "Image size too large for current pixelSize!");
+        return;
+    }
+
+    pixelImage = loadedImage.convertToFormat(QImage::Format_RGB32);
+    if (pixelImage.isNull()) {
+        qDebug() << "Error: pixelImage is invalid after conversion!";
+        return;
+    }
+
+    if (updateTimer->isActive()) {
+        updateTimer->stop();
+    }
+    pendingUpdates.clear();
+
+
+    if (painter) {
+        delete painter;
+        painter = nullptr;
+    }
     pixelPixmap = QPixmap::fromImage(pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
+    if (pixelPixmap.isNull()) {
+        qDebug() << "Error: Failed to create pixelPixmap with size" << gridWidth * pixelSize << "x" << gridHeight * pixelSize;
+        return;
+    }
+    painter = new QPainter(&pixelPixmap);
+
+    if (!pixelLabel) {
+        pixelLabel = new QLabel(this);
+        pixelLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    }
     pixelLabel->setPixmap(pixelPixmap);
+    pixelLabel->setFixedSize(gridWidth * pixelSize, gridHeight * pixelSize);
+    pixelLabel->move(0, 0);
+
+
+    if (!scrollArea) {
+        qDebug() << "Error: scrollArea is null in openImage";
+        return;
+    }
+    if (scrollArea->widget() != pixelLabel) {
+        scrollArea->setWidget(pixelLabel);
+    }
+
+
+    history.clear();
+    redoHistory.clear();
+    for (int y = 0; y < gridHeight; ++y) {
+        for (int x = 0; x < gridWidth; ++x) {
+            QColor color = pixelImage.pixelColor(x, y);
+            saveStateToHistory(x, y, color);
+        }
+    }
 
     qDebug() << "Opened image:" << filePath << "with size:" << gridWidth << "x" << gridHeight;
 }
+
 
 void PixelArtDialog::chooseColor() {
     QColor color = QColorDialog::getColor();
@@ -168,27 +317,41 @@ bool PixelArtDialog::eventFilter(QObject* obj, QEvent* event) {
 
     if (event->type() == QEvent::MouseButtonPress || (event->type() == QEvent::MouseMove && isDrawing)) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-
         QPoint pos = mouseEvent->pos();
         int x = pos.x() / pixelSize;
         int y = pos.y() / pixelSize;
 
-        if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
-            if (event->type() == QEvent::MouseButtonPress) {
-                saveStateToHistory(x, y, pixelImage.pixelColor(x, y));
-                isDrawing = true;
-            }
-            if (mouseEvent->buttons() & Qt::LeftButton && !coordinateCheckbox->isChecked()) {
-                pixelImage.setPixelColor(x, y, selectedColor);
-            } else if (mouseEvent->buttons() & Qt::RightButton) {
-                pixelImage.setPixelColor(x, y, Qt::white);
-            }
-            pixelPixmap = QPixmap::fromImage(pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
-            pixelLabel->setPixmap(pixelPixmap);
-            coordinatesLabel->setText(QString("Coordinates: (%1, %2)").arg(x).arg(y));
-        } else {
-            qDebug() << "Coordinate out of range:" << x << "," << y;
+        if (pixelImage.isNull()) {
+            qDebug() << "Error: pixelImage is null!";
+            return false;
         }
+
+        if (x < 0 || x >= pixelImage.width() || y < 0 || y >= pixelImage.height()) {
+            qDebug() << "Error: Out of bounds access at" << x << "," << y;
+            return false;
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            saveStateToHistory(x, y, pixelImage.pixelColor(x, y));
+            isDrawing = true;
+        }
+
+        QColor color = (mouseEvent->buttons() & Qt::LeftButton && !coordinateCheckbox->isChecked())
+                       ? selectedColor
+                       : (mouseEvent->buttons() & Qt::RightButton ? Qt::white : pixelImage.pixelColor(x, y));
+
+        pendingUpdates.append({x, y, color});
+
+        if (!updateTimer) {
+            qDebug() << "Error: updateTimer is null!";
+            return false;
+        }
+
+        if (!updateTimer->isActive()) {
+            updateTimer->start(16);
+        }
+
+        coordinatesLabel->setText(QString("(%1, %2)").arg(x).arg(y));
         return true;
     }
     else if (event->type() == QEvent::MouseButtonRelease) {
@@ -210,34 +373,30 @@ bool PixelArtDialog::eventFilter(QObject* obj, QEvent* event) {
     return QMainWindow::eventFilter(obj, event);
 }
 
+
 void PixelArtDialog::saveStateToHistory(int x, int y, QColor color) {
     history.append({x, y, color});
+}
+
+void PixelArtDialog::undo() {
+    if (!history.isEmpty()) {
+        PixelChange change = history.takeLast();
+        QColor currentColor = pixelImage.pixelColor(change.x, change.y);
+        pixelImage.setPixelColor(change.x, change.y, change.color);
+        redoHistory.append({change.x, change.y, currentColor});
+        painter->fillRect(change.x * pixelSize, change.y * pixelSize, pixelSize, pixelSize, change.color);
+        pixelLabel->setPixmap(pixelPixmap);
+    }
 }
 
 void PixelArtDialog::redo() {
     if (!redoHistory.isEmpty()) {
         PixelChange change = redoHistory.takeLast();
         QColor currentColor = pixelImage.pixelColor(change.x, change.y);
-        pixelImage.setPixelColor(change.x, change.y, change.color);  // Áp dụng màu từ Redo
-        history.append({change.x, change.y, currentColor});         // Lưu màu hiện tại vào Undo
-        pixelPixmap = QPixmap::fromImage(pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
+        pixelImage.setPixelColor(change.x, change.y, change.color);
+        history.append({change.x, change.y, currentColor});
+        painter->fillRect(change.x * pixelSize, change.y * pixelSize, pixelSize, pixelSize, change.color);
         pixelLabel->setPixmap(pixelPixmap);
-        qDebug() << "Redo to: (" << change.x << "," << change.y << ") with color" << change.color;
-    } else {
-        qDebug() << "No redo actions available";
-    }
-}
-void PixelArtDialog::undo() {
-    if (!history.isEmpty()) {
-        PixelChange change = history.takeLast();
-        QColor currentColor = pixelImage.pixelColor(change.x, change.y);
-        pixelImage.setPixelColor(change.x, change.y, change.color);  // Khôi phục màu cũ
-        redoHistory.append({change.x, change.y, currentColor});     // Lưu màu hiện tại vào Redo
-        pixelPixmap = QPixmap::fromImage(pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
-        pixelLabel->setPixmap(pixelPixmap);
-        qDebug() << "Undo to: (" << change.x << "," << change.y << ") with color" << change.color;
-    } else {
-        qDebug() << "No undo actions available";
     }
 }
 
@@ -247,12 +406,8 @@ void PixelArtDialog::zoomIn(const QPoint& zoomPoint) {
         pixelSize += 2;
         qDebug() << "Zoom in, pixelSize:" << pixelSize;
 
-
         qreal zoomFactor = (qreal)pixelSize / oldPixelSize;
-
-
         QPoint center = zoomPoint.isNull() ? scrollArea->viewport()->rect().center() : zoomPoint;
-
 
         updatePixelSizes();
 
@@ -265,49 +420,31 @@ void PixelArtDialog::zoomIn(const QPoint& zoomPoint) {
 
 void PixelArtDialog::zoomOut(const QPoint& zoomPoint) {
     if (pixelSize > 2) {
-        // Lưu kích thước và vị trí trước khi zoom
         int oldPixelSize = pixelSize;
         pixelSize -= 2;
         qDebug() << "Zoom out, pixelSize:" << pixelSize;
 
-        // Tính tỷ lệ zoom
         qreal zoomFactor = (qreal)pixelSize / oldPixelSize;
-
-        // Lấy vị trí tâm zoom (chuột hoặc trung tâm nếu không có zoomPoint)
         QPoint center = zoomPoint.isNull() ? scrollArea->viewport()->rect().center() : zoomPoint;
 
-        // Cập nhật kích thước lưới
         updatePixelSizes();
 
-        // Điều chỉnh thanh cuộn để giữ tâm zoom cố định
         int newScrollX = (center.x() * zoomFactor) - (scrollArea->viewport()->width() / 2);
         int newScrollY = (center.y() * zoomFactor) - (scrollArea->viewport()->height() / 2);
         scrollArea->horizontalScrollBar()->setValue(newScrollX);
         scrollArea->verticalScrollBar()->setValue(newScrollY);
     }
 }
+
 void PixelArtDialog::updatePixelSizes() {
-    qDebug() << "Updating pixel sizes with pixelSize:" << pixelSize;
-
-
-    pixelPixmap = QPixmap::fromImage(pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
+    delete painter;
+    pixelPixmap = QPixmap(gridWidth * pixelSize, gridHeight * pixelSize);
+    pixelPixmap.fill(Qt::white);
+    painter = new QPainter(&pixelPixmap);
+    painter->drawImage(0, 0, pixelImage.scaled(gridWidth * pixelSize, gridHeight * pixelSize));
     pixelLabel->setPixmap(pixelPixmap);
-
-    int whiteWidth = gridWidth * pixelSize;
-    int whiteHeight = gridHeight * pixelSize;
-
-    int viewWidth = scrollArea->viewport()->width();
-    int viewHeight = scrollArea->viewport()->height();
-
-
-    int offsetX = qMax(0, (viewWidth - whiteWidth) / 2);
-    int offsetY = qMax(0, (viewHeight - whiteHeight) / 2);
-
-
-    pixelLabel->setFixedSize(whiteWidth, whiteHeight);
-    pixelLabel->move(offsetX, offsetY);
-
-    qDebug() << "White region size:" << whiteWidth << "x" << whiteHeight << "Offset:" << offsetX << "," << offsetY;
+    pixelLabel->setFixedSize(gridWidth * pixelSize, gridHeight * pixelSize);
+    pixelLabel->move(0, 0);
 }
 
 void PixelArtDialog::savePixelDesign() {

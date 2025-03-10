@@ -5,12 +5,15 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QScrollArea>
-#include <QScrollBar>  // Thêm dòng này
+#include <QScrollBar>
 #include <QCheckBox>
 #include <QLabel>
 #include <QColor>
 #include <QImage>
 #include <QPixmap>
+#include <QPainter>
+#include <QTimer>
+
 
 class PixelArtDialog : public QMainWindow {
     Q_OBJECT
@@ -70,6 +73,9 @@ private:
     QPushButton* previewButton;
     QCheckBox* coordinateCheckbox;
     QLabel* coordinatesLabel;
+    QPainter* painter;
+    QTimer* updateTimer;
+    QVector<PixelChange> pendingUpdates;
 };
 
 #endif
